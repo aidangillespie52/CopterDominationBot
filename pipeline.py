@@ -13,5 +13,3 @@ h = Driver()
 h.get("https://crazygames.com")
 # input()
 
-y = Driver()
-y.get("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
