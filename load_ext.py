@@ -12,7 +12,7 @@ def main():
         browser="chrome",
         uc=True,               # optional (undetected mode)
         headless=False,
-        extensions=[EXT_PATH]  # 👈 add your extension here
+        extension_dir=EXT_PATH  # 👈 add your extension here
     )
 
     driver.get("https://copter.io")
