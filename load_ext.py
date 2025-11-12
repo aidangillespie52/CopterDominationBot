@@ -10,13 +10,16 @@ def main():
 
     driver = Driver(
         browser="chrome",
-        uc=True,               # optional (undetected mode)
+        uc=True,
         headless=False,
-        extension_dir=EXT_PATH  # 👈 add your extension here
+        extension_dir=EXT_PATH
     )
 
     driver.get("https://copter.io")
     input("Press Enter to close...")
+    
+    # TODO: find a way to add the tamper.js to the tampermonkey extension
+    
     driver.quit()
 
 if __name__ == "__main__":
