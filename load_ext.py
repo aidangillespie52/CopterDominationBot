@@ -6,10 +6,10 @@ load_dotenv()
 
 def main():
     # Path to your unpacked Chrome extension folder (.crx or unpacked dir)
-    PROFILE_PATH = os.getenv("profilepth")
+    PROFILE_PATH = os.getenv("extpth")
 
     sb = SB(uc=True, user_data_dir=PROFILE_PATH, headed=True)
-    sb.open("https://x.com")
+    sb.open("https://copter.io")
     input()
     print(sb.driver.title)
     
