@@ -8,17 +8,11 @@ def main():
     # Path to your unpacked Chrome extension folder (.crx or unpacked dir)
     PROFILE_PATH = os.getenv("profilepth")
 
-    sb = SB(uc=True, user_data_dir=PROFILE_PATH, headed=True)
-    sb.open("https://x.com")
-    input()
-    print(sb.driver.title)
-    
-    sb.open("https://copter.io")
-    input("Press Enter to close...")
+    with SB(uc=True, user_data_dir=PROFILE_PATH, headed=True) as sb:
+        sb.open("https://copter.io")
+        input("Press Enter to close...")
     
     # TODO: find a way to add the tamper.js to the tampermonkey extension
     
-    sb.quit()
-
 if __name__ == "__main__":
     main()
