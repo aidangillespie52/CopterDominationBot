@@ -5,7 +5,7 @@
 // @description  Log after each frame so stage/root is available + preview rendered textures + show texture file/frame
 // @match        *://*/*
 // @run-at       document-start
-// @grant        none
+// @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
 (function () {
