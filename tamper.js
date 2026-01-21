@@ -30,6 +30,7 @@
   }
 
   function flushQueue() {
+    console.log("flushQueue called")
     if (__sendInFlight) return;
 
     const now = Date.now();
@@ -41,6 +42,7 @@
     __sendInFlight = true;
     __lastSendAt = now;
 
+    console.log("before request attempt")
     try {
       GM_xmlhttpRequest({
         method: "POST",
@@ -61,6 +63,7 @@
         ontimeout: () => { __sendInFlight = false; }
       });
     } catch (e) {
+      console.log(`request attempt failed ${e}`)
       __sendInFlight = false;
     }
   }
