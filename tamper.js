@@ -344,9 +344,10 @@
               return d;
             });
 
-            console.table(rows);
-            console.groupEnd();
+            // console.table(rows);
+            // console.groupEnd();
             
+            console.log("sending data")
             enqueueSend({
               ts: Date.now(),
               page: location.href,
