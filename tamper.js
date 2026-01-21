@@ -13,6 +13,58 @@
 
   const THROTTLE_FRAMES = 15; // log every N frames
 
+  // -------- API sender ----------
+  const API_URL = "https://api.yourdomain.com/pixi-ingest";
+  const API_TOKEN = ""; // optional: "Bearer xxx" style below
+  const SEND_EVERY_MS = 2000; // minimum time between sends
+  const MAX_QUEUE = 5;        // drop older frames if we get behind
+
+  let __lastSendAt = 0;
+  let __sendInFlight = false;
+  let __queue = [];
+
+  function enqueueSend(payload) {
+    __queue.push(payload);
+    if (__queue.length > MAX_QUEUE) __queue.shift(); // drop oldest
+    flushQueue();
+  }
+
+  function flushQueue() {
+    if (__sendInFlight) return;
+
+    const now = Date.now();
+    if (now - __lastSendAt < SEND_EVERY_MS) return;
+
+    const next = __queue.pop(); // keep most recent
+    __queue.length = 0;
+
+    __sendInFlight = true;
+    __lastSendAt = now;
+
+    try {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: API_URL,
+        headers: {
+          "Content-Type": "application/json",
+          ...(API_TOKEN ? { "Authorization": `Bearer ${API_TOKEN}` } : {})
+        },
+        data: JSON.stringify(next),
+        timeout: 15000,
+        onload: (res) => {
+          __sendInFlight = false;
+          // optional debug:
+          // console.log("[PIXI API] sent", res.status);
+          flushQueue(); // send again if queued
+        },
+        onerror: () => { __sendInFlight = false; },
+        ontimeout: () => { __sendInFlight = false; }
+      });
+    } catch (e) {
+      __sendInFlight = false;
+    }
+  }
+
   // -------- texture preview helpers ----------
   function getExtract(renderer){
     return renderer && (renderer.extract || renderer.plugins?.extract) || null;
@@ -294,6 +346,15 @@
 
             console.table(rows);
             console.groupEnd();
+            
+            enqueueSend({
+              ts: Date.now(),
+              page: location.href,
+              pixiVersion: window.PIXI?.VERSION || null,
+              rendererType: this?.constructor?.name || null,
+              renderables: rows
+            });
+
           } catch (e) {
             // swallow to avoid breaking host app
           }
