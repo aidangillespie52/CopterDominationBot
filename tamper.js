@@ -54,7 +54,7 @@
         onload: (res) => {
           __sendInFlight = false;
           // optional debug:
-          // console.log("[PIXI API] sent", res.status);
+          console.log("[PIXI API] sent", res.status);
           flushQueue(); // send again if queued
         },
         onerror: () => { __sendInFlight = false; },
@@ -344,10 +344,11 @@
               return d;
             });
 
-            // console.table(rows);
-            // console.groupEnd();
+            console.table(rows);
+            console.groupEnd();
             
             console.log("sending data")
+
             enqueueSend({
               ts: Date.now(),
               page: location.href,
