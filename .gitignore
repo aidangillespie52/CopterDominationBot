@@ -3,5 +3,4 @@
 **/*.pyc
 **/downloaded_files/
 **/.env
-**/tamper_monkey_ext/
-**/tamper_monkey_ext.zip/
+logs/
