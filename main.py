@@ -11,6 +11,7 @@ from typing import Optional
 from logger import setup_logger
 
 logger = setup_logger(__name__)
+
 # --- Load frames lookup ---
 FRAMES_FILEPATH = Path("data") / "frames.csv"
 
@@ -83,16 +84,24 @@ class PixiPayload(BaseModel):
     renderables: list[Renderable]
 
 _latest_payload: str | None = None
-MIN_RENDERABLES = 5  # ignore payloads with fewer objects than this
+MIN_RENDERABLES = 5      # ignore payloads with fewer objects than this
+REMOVE_LIST = {"unknown", "shadow1", "shadow2", "gridpixel"}  # frame names to strip from the payload entirely
 
 @app.post("/pixi-ingest", status_code=204)
 async def ingest(payload: PixiPayload):
     global _latest_payload
     if len(payload.renderables) < MIN_RENDERABLES:
         return
+
+    filtered = []
     for obj in payload.renderables:
         name = resolve_frame_name(obj)
-        print(f"{name} @ ({obj.x}, {obj.y})")
+        if name in REMOVE_LIST:
+            continue
+        logger.info(f"{name} @ ({obj.x}, {obj.y})")
+        filtered.append(obj)
+
+    payload.renderables = filtered
     _latest_payload = payload.model_dump_json()
 
 @app.get("/pixi-latest")
