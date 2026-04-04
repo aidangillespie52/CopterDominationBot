@@ -3,7 +3,7 @@
 
   const THROTTLE_FRAMES = 15;
   const API_URL = "http://localhost:5000/pixi-ingest"; // your local Python server
-  const SEND_EVERY_MS = 2000;
+  const SEND_EVERY_MS = 50;
   const MAX_QUEUE = 5;
 
   let __lastSendAt = 0;
