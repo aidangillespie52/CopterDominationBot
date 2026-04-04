@@ -62,7 +62,7 @@ async def ingest(payload: PixiPayload):
         print(f"{name} @ ({obj.x}, {obj.y})")
 
 # --- Selenium ---
-INJECT_SCRIPT_FILEPATH = Path("js") / "tamper.js"
+INJECT_SCRIPT_FILEPATH = Path("js") / "pixi4-render-spy.js"
 
 def run_server():
     uvicorn.run(app, host="0.0.0.0", port=5000)
