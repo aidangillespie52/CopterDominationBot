@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixi Render Visualizer</title>
+<style>
+  :root {
+    --bg: #0d0d14;
+    --bg2: #13131f;
+    --bg3: #1a1a2e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e2e0d8;
+    --text2: #888680;
+    --text3: #555350;
+    --accent: #4FC3F7;
+    --accent2: #FFB74D;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; overflow: hidden; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Toolbar ── */
+  #toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+    border-bottom: 1px solid var(--border); background: var(--bg2);
+    flex-shrink: 0; flex-wrap: wrap;
+  }
+  #toolbar .title { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); text-transform: uppercase; margin-right: 6px; }
+  #toolbar label { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 5px; }
+  #toolbar input[type=range] { width: 72px; accent-color: var(--accent); cursor: pointer; }
+  #toolbar .val { font-size: 11px; min-width: 32px; color: var(--text); }
+  #toolbar select {
+    font-size: 11px; font-family: var(--mono); background: var(--bg3);
+    color: var(--text); border: 1px solid var(--border2); border-radius: 3px;
+    padding: 3px 6px; cursor: pointer;
+  }
+  #toolbar button {
+    font-size: 11px; font-family: var(--mono); padding: 4px 10px;
+    background: transparent; color: var(--text2); border: 1px solid var(--border2);
+    border-radius: 3px; cursor: pointer; transition: all .15s;
+  }
+  #toolbar button:hover { color: var(--text); border-color: var(--accent); }
+  #toolbar button.primary { color: var(--accent); border-color: var(--accent); }
+  #toolbar button.primary:hover { background: rgba(79,195,247,.1); }
+  .sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; transition: background .3s; }
+  .live-dot.active { background: #4caf50; box-shadow: 0 0 6px #4caf5088; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ── Main layout ── */
+  #main { display: flex; flex: 1; min-height: 0; }
+
+  /* ── Sidebar ── */
+  #sidebar { width: 210px; flex-shrink: 0; border-right: 1px solid var(--border); overflow-y: auto; background: var(--bg2); }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .obj-row {
+    padding: 5px 10px; cursor: pointer; border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .obj-row:hover { background: rgba(255,255,255,.04); }
+  .obj-row.sel { background: rgba(79,195,247,.1); border-left: 2px solid var(--accent); padding-left: 8px; }
+  .obj-name { font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .obj-meta { font-size: 10px; color: var(--text2); }
+  .obj-swatch { display: inline-block; width: 7px; height: 7px; border-radius: 1px; margin-right: 4px; vertical-align: middle; flex-shrink: 0; }
+
+  /* ── Canvas ── */
+  #canvas-wrap {
+    flex: 1; overflow: auto; position: relative; background: var(--bg3);
+    cursor: crosshair;
+  }
+  #canvas-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  #canvas-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  canvas { display: block; }
+  #hud {
+    position: sticky; bottom: 8px; left: 8px; font-size: 10px;
+    color: rgba(255,255,255,.3); pointer-events: none;
+    font-family: var(--mono); white-space: nowrap;
+  }
+
+  /* ── Paste overlay ── */
+  #overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: rgba(13,13,20,.94); z-index: 20;
+  }
+  #overlay h2 { font-size: 13px; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+  #overlay p { font-size: 11px; color: var(--text2); text-align: center; line-height: 1.6; }
+  #overlay textarea {
+    width: 420px; height: 150px; font-size: 11px; font-family: var(--mono);
+    padding: 10px; border-radius: 4px; border: 1px solid var(--border2);
+    background: var(--bg2); color: var(--text); resize: vertical; outline: none;
+    transition: border .15s;
+  }
+  #overlay textarea:focus { border-color: var(--accent); }
+  #overlay .btns { display: flex; gap: 8px; }
+
+  /* ── Detail bar ── */
+  #detail {
+    padding: 7px 14px; border-top: 1px solid var(--border);
+    background: var(--bg2); display: flex; gap: 18px; flex-wrap: wrap;
+    min-height: 46px; align-items: center; flex-shrink: 0;
+  }
+  .kv { display: flex; flex-direction: column; gap: 1px; }
+  .dk { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); }
+  .dv { font-size: 11px; color: var(--text); }
+  #detail .hint { font-size: 11px; color: var(--text3); }
+
+  /* ── Stats bar ── */
+  #statsbar {
+    padding: 4px 14px; border-top: 1px solid var(--border); background: var(--bg);
+    font-size: 10px; color: var(--text3); display: flex; gap: 18px; flex-shrink: 0;
+  }
+  #statsbar span b { color: var(--text2); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <span class="title">Pixi Spy</span>
+    <div class="sep"></div>
+    <label>Scale
+      <input type="range" id="scaleR" min="10" max="300" value="100">
+      <span class="val" id="scaleV">1.0×</span>
+    </label>
+    <div class="sep"></div>
+    <label>Marker
+      <input type="range" id="boxR" min="4" max="60" value="16">
+      <span class="val" id="boxV">16</span>
+    </label>
+    <div class="sep"></div>
+    <label>Color
+      <select id="colorMode">
+        <option value="type">by type</option>
+        <option value="frame">by frame</option>
+        <option value="alpha">by alpha</option>
+      </select>
+    </label>
+    <div class="sep"></div>
+    <label><input type="checkbox" id="chkLabels" checked> labels</label>
+    <label><input type="checkbox" id="chkGrid"> grid</label>
+    <label><input type="checkbox" id="chkFrameRect"> frame rect</label>
+    <div class="sep"></div>
+    <div class="live-dot" id="liveDot"></div>
+    <label style="font-size:10px;color:var(--text3)" id="liveLabel">stopped</label>
+    <button id="btnPoll" class="primary">▶ Start Live</button>
+    <div class="sep"></div>
+    <button class="primary" id="btnLoad">Load JSON</button>
+    <button id="btnClear">Clear</button>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="sidebar"></div>
+    <div id="canvas-wrap">
+      <canvas id="c"></canvas>
+      <div id="hud"></div>
+
+      <!-- Overlay -->
+      <div id="overlay">
+        <h2>Pixi Render Visualizer</h2>
+        <p>Paste a <code>/pixi-ingest</code> payload to render,<br>or hit Start Live to poll the server automatically.</p>
+        <textarea id="pasteTA" placeholder='{"ts": 0, "renderables": [{"type":"Sprite","name":"player","x":200,"y":150,"alpha":1,"frameKey":"hero"}]}'></textarea>
+        <div class="btns">
+          <button id="btnPasteRender" class="primary">Render JSON</button>
+          <button id="btnLoadSample">Load Sample</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail bar -->
+  <div id="detail"><span class="hint">click a marker to inspect</span></div>
+
+  <!-- Stats bar -->
+  <div id="statsbar">
+    <span><b id="stCount">0</b> objects</span>
+    <span>bounds: <b id="stBounds">—</b></span>
+    <span>page: <b id="stPage">—</b></span>
+    <span>pixi: <b id="stPixi">—</b></span>
+    <span>ts: <b id="stTs">—</b></span>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ── Palette ────────────────────────────────────────────────
+const PALETTE = [
+  '#4FC3F7','#AED581','#FFB74D','#F06292','#CE93D8',
+  '#80DEEA','#FFCC02','#FF8A65','#A5D6A7','#90CAF9',
+  '#BCAAA4','#B0BEC5','#EF9A9A','#FFF59D','#C5E1A5',
+];
+
+function strHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0;
+  return h % PALETTE.length;
+}
+function typeColor(o)  { return PALETTE[strHash(o.type || '')]; }
+function frameColor(o) { return PALETTE[strHash(o.frameKey || o.name || o.type || '')]; }
+function alphaColor(a) {
+  const t = Math.min(1, Math.max(0, a ?? 0.5));
+  const r = ~~(0x3B + (0xE2 - 0x3B) * t);
+  const g = ~~(0x8B + (0x4B - 0x8B) * t);
+  const b = ~~(0xD4 + (0x4A - 0xD4) * t);
+  return `rgb(${r},${g},${b})`;
+}
+function getColor(o) {
+  const m = document.getElementById('colorMode').value;
+  if (m === 'frame') return frameColor(o);
+  if (m === 'alpha') return alphaColor(o.alpha);
+  return typeColor(o);
+}
+
+// ── State ──────────────────────────────────────────────────
+let renderables = [];
+let selected = -1;
+let scale = 1.0;
+let boxSize = 16;
+let originX = 0, originY = 0; // declared above in poll section
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+const sidebar = document.getElementById('sidebar');
+const detailEl = document.getElementById('detail');
+const hud = document.getElementById('hud');
+const overlay = document.getElementById('overlay');
+
+// ── Bounds ─────────────────────────────────────────────────
+function getBounds() {
+  if (!renderables.length) return { minX:0, minY:0, maxX:800, maxY:600 };
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (const o of renderables) {
+    const x = o.x ?? 0, y = o.y ?? 0;
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+// ── Draw ───────────────────────────────────────────────────
+function draw() {
+  const b = getBounds();
+  const margin = Math.max(60, boxSize * 3 + 40);
+  const cw = Math.max(600, (b.maxX - b.minX) * scale + margin * 2);
+  const ch = Math.max(400, (b.maxY - b.minY) * scale + margin * 2);
+  canvas.width = cw;
+  canvas.height = ch;
+  originX = margin - b.minX * scale;
+  originY = margin - b.minY * scale;
+
+  ctx.clearRect(0, 0, cw, ch);
+
+  // BG
+  ctx.fillStyle = '#0d0d14';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Grid
+  if (document.getElementById('chkGrid').checked) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.5;
+    const step = Math.max(20, 100 * scale);
+    for (let x = originX % step; x < cw; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
+    }
+    for (let y = originY % step; y < ch; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+    }
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, ch); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(cw, originY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.font = '10px monospace';
+  ctx.fillText('0,0', originX + 4, originY - 4);
+
+  const showLabels = document.getElementById('chkLabels').checked;
+  const showFrameRect = document.getElementById('chkFrameRect').checked;
+  const half = boxSize / 2;
+  const fs = Math.max(9, Math.min(12, scale * 0.6 + 8));
+
+  for (let i = 0; i < renderables.length; i++) {
+    const o = renderables[i];
+    const cx = originX + (o.x ?? 0) * scale;
+    const cy = originY + (o.y ?? 0) * scale;
+    const color = getColor(o);
+    const isSel = i === selected;
+
+    // Frame rect (if available and toggled on)
+    if (showFrameRect && o.frameW && o.frameH) {
+      ctx.strokeStyle = color + '44';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(
+        cx - (o.frameW / 2) * scale,
+        cy - (o.frameH / 2) * scale,
+        o.frameW * scale,
+        o.frameH * scale
+      );
+      ctx.setLineDash([]);
+    }
+
+    // Glow for selected
+    if (isSel) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 14;
+    }
+
+    // Box
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSel ? 2 : 0.8;
+    ctx.fillStyle = color + (isSel ? '44' : '20');
+    ctx.beginPath();
+    roundRect(ctx, cx - half, cy - half, boxSize, boxSize, 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Center dot
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, isSel ? 3 : 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    if (showLabels) {
+      const label = (o.name || o.frameKey || o.type || '').slice(0, 26);
+      ctx.font = `${fs}px monospace`;
+      ctx.fillStyle = isSel ? '#fff' : 'rgba(255,255,255,0.55)';
+      ctx.fillText(label, cx + half + 4, cy + 4);
+    }
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── Load payload ───────────────────────────────────────────
+function loadPayload(data) {
+  let p;
+  try { p = typeof data === 'string' ? JSON.parse(data) : data; }
+  catch (e) { alert('Invalid JSON:\n' + e.message); return; }
+
+  renderables = (p.renderables || []).map(r => ({
+    type:     r.type     || 'DisplayObject',
+    name:     r.name     || '',
+    x:        r.x        ?? 0,
+    y:        r.y        ?? 0,
+    alpha:    r.alpha    ?? 1,
+    frameKey: r.frameKey || null,
+    texURL:   r.texURL   || null,
+    frameX:   r.frameX   ?? null,
+    frameY:   r.frameY   ?? null,
+    frameW:   r.frameW   ?? null,
+    frameH:   r.frameH   ?? null,
+  }));
+
+  selected = -1;
+  overlay.style.display = 'none';
+  buildSidebar();
+  updateStats(p);
+  draw();
+}
+
+// ── Sidebar ────────────────────────────────────────────────
+function buildSidebar() {
+  sidebar.innerHTML = '';
+  renderables.forEach((o, i) => {
+    const div = document.createElement('div');
+    div.className = 'obj-row' + (i === selected ? ' sel' : '');
+    const color = getColor(o);
+    div.innerHTML =
+      `<div class="obj-name"><span class="obj-swatch" style="background:${color}"></span>${esc(o.name || o.frameKey || o.type)}</div>` +
+      `<div class="obj-meta">(${o.x}, ${o.y}) · α${(o.alpha ?? 1).toFixed(2)}</div>`;
+    div.onclick = () => selectObj(i);
+    sidebar.appendChild(div);
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Select ─────────────────────────────────────────────────
+function selectObj(i) {
+  selected = i;
+  buildSidebar();
+  draw();
+  const o = renderables[i];
+  if (!o) return;
+
+  detailEl.innerHTML = [
+    kv('type',       o.type),
+    kv('name',       o.name || '—'),
+    kv('x / y',      `${o.x} / ${o.y}`),
+    kv('alpha',      (o.alpha ?? 1).toFixed(3)),
+    kv('frameKey',   o.frameKey || '—'),
+    kv('frame rect', o.frameX != null ? `${o.frameX}, ${o.frameY}  ${o.frameW} × ${o.frameH}` : '—'),
+    kv('texURL',     o.texURL ? o.texURL.split('/').pop().slice(0, 40) : '—'),
+  ].join('');
+
+  // Scroll sidebar row into view
+  const rows = sidebar.querySelectorAll('.obj-row');
+  if (rows[i]) rows[i].scrollIntoView({ block: 'nearest' });
+}
+
+function kv(k, v) {
+  return `<div class="kv"><span class="dk">${k}</span><span class="dv">${esc(String(v))}</span></div>`;
+}
+
+// ── Stats ──────────────────────────────────────────────────
+function updateStats(p) {
+  const b = getBounds();
+  document.getElementById('stCount').textContent  = renderables.length;
+  document.getElementById('stBounds').textContent =
+    `(${Math.round(b.minX)},${Math.round(b.minY)}) → (${Math.round(b.maxX)},${Math.round(b.maxY)})`;
+  document.getElementById('stPage').textContent   = p?.page  ? new URL(p.page).hostname : '—';
+  document.getElementById('stPixi').textContent   = p?.pixiVersion || '—';
+  document.getElementById('stTs').textContent     = p?.ts ? new Date(p.ts).toLocaleTimeString() : '—';
+}
+
+// ── Canvas interactions ────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const hitR = boxSize / 2 + 5;
+  for (let i = renderables.length - 1; i >= 0; i--) {
+    const o = renderables[i];
+    const cx = originX + (o.x ?? 0) * scale;
+    const cy = originY + (o.y ?? 0) * scale;
+    if (mx >= cx - hitR && mx <= cx + hitR && my >= cy - hitR && my <= cy + hitR) {
+      selectObj(i); return;
+    }
+  }
+  selected = -1;
+  buildSidebar();
+  draw();
+  detailEl.innerHTML = '<span class="hint">click a marker to inspect</span>';
+});
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const wx = Math.round((mx - originX) / scale);
+  const wy = Math.round((my - originY) / scale);
+  hud.textContent = `world (${wx}, ${wy})  ·  ${renderables.length} objects  ·  scale ${scale.toFixed(2)}×`;
+});
+
+// ── Controls ───────────────────────────────────────────────
+document.getElementById('scaleR').oninput = function () {
+  scale = this.value / 100;
+  document.getElementById('scaleV').textContent = scale.toFixed(2) + '×';
+  draw();
+};
+document.getElementById('boxR').oninput = function () {
+  boxSize = +this.value;
+  document.getElementById('boxV').textContent = boxSize;
+  draw();
+};
+document.getElementById('chkLabels').onchange    = draw;
+document.getElementById('chkGrid').onchange      = draw;
+document.getElementById('chkFrameRect').onchange = draw;
+document.getElementById('colorMode').onchange    = () => { buildSidebar(); draw(); };
+
+document.getElementById('btnLoad').onclick = () => { overlay.style.display = 'flex'; };
+
+document.getElementById('btnClear').onclick = () => {
+  renderables = []; selected = -1;
+  sidebar.innerHTML = '';
+  detailEl.innerHTML = '<span class="hint">click a marker to inspect</span>';
+  document.getElementById('stCount').textContent = '0';
+  document.getElementById('stBounds').textContent = '—';
+  overlay.style.display = 'flex';
+  if (canvas.width) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+};
+
+document.getElementById('btnPasteRender').onclick = () => {
+  loadPayload(document.getElementById('pasteTA').value);
+};
+
+document.getElementById('btnLoadSample').onclick = () => {
+  loadPayload(SAMPLE);
+  document.getElementById('pasteTA').value = JSON.stringify(SAMPLE, null, 2);
+};
+
+// ── Poll live feed ─────────────────────────────────────────
+const POLL_URL = 'http://localhost:5000/pixi-latest';
+const POLL_MS  = 250;
+let pollTimer  = null;
+let lastTs     = null;
+
+document.getElementById('btnPoll').onclick = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    setLive(false);
+    document.getElementById('btnPoll').textContent = '▶ Start Live';
+  } else {
+    pollTimer = setInterval(pollOnce, POLL_MS);
+    setLive(true);
+    document.getElementById('btnPoll').textContent = '■ Stop Live';
+    pollOnce();
+  }
+};
+
+async function pollOnce() {
+  try {
+    const r = await fetch(POLL_URL);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.ts) return;
+    if (data.ts === lastTs) return;   // nothing new — skip redraw
+    lastTs = data.ts;
+    loadPayload(data);
+  } catch (_) {}
+}
+
+function setLive(on) {
+  document.getElementById('liveDot').classList.toggle('active', on);
+  document.getElementById('liveLabel').textContent = on ? 'live' : 'stopped';
+}
+
+// ── Sample data ────────────────────────────────────────────
+const SAMPLE = {
+  ts: Date.now(),
+  page: "https://copter.io",
+  pixiVersion: "4.8.9",
+  renderables: [
+    {type:"Sprite",name:"bg",         x:400,y:300,alpha:1,   frameKey:"background",  frameX:0,  frameY:0,  frameW:800,frameH:600},
+    {type:"Sprite",name:"ground",     x:400,y:570,alpha:1,   frameKey:"ground_tile", frameX:0,  frameY:600,frameW:800,frameH:60},
+    {type:"Sprite",name:"player",     x:210,y:180,alpha:1,   frameKey:"copter_body", frameX:64, frameY:0,  frameW:64, frameH:32},
+    {type:"Sprite",name:"rotor",      x:220,y:168,alpha:0.9, frameKey:"rotor_spin",  frameX:128,frameY:0,  frameW:32, frameH:8},
+    {type:"Sprite",name:"bullet0",    x:310,y:182,alpha:1,   frameKey:"bullet",      frameX:192,frameY:0,  frameW:8,  frameH:4},
+    {type:"Sprite",name:"bullet1",    x:360,y:182,alpha:1,   frameKey:"bullet",      frameX:192,frameY:0,  frameW:8,  frameH:4},
+    {type:"Sprite",name:"enemy0",     x:520,y:200,alpha:1,   frameKey:"enemy_a",     frameX:0,  frameY:64, frameW:48, frameH:32},
+    {type:"Sprite",name:"enemy1",     x:600,y:150,alpha:0.8, frameKey:"enemy_a",     frameX:0,  frameY:64, frameW:48, frameH:32},
+    {type:"Sprite",name:"enemy2",     x:680,y:260,alpha:1,   frameKey:"enemy_b",     frameX:48, frameY:64, frameW:48, frameH:32},
+    {type:"Sprite",name:"coin0",      x:400,y:120,alpha:1,   frameKey:"coin",        frameX:96, frameY:64, frameW:16, frameH:16},
+    {type:"Sprite",name:"coin1",      x:460,y:90, alpha:0.95,frameKey:"coin",        frameX:96, frameY:64, frameW:16, frameH:16},
+    {type:"Sprite",name:"coin2",      x:500,y:110,alpha:1,   frameKey:"coin",        frameX:96, frameY:64, frameW:16, frameH:16},
+    {type:"Sprite",name:"cloud0",     x:100,y:80, alpha:0.6, frameKey:"cloud",       frameX:0,  frameY:128,frameW:96, frameH:48},
+    {type:"Sprite",name:"cloud1",     x:580,y:50, alpha:0.5, frameKey:"cloud",       frameX:0,  frameY:128,frameW:96, frameH:48},
+    {type:"Sprite",name:"explosion0", x:540,y:205,alpha:0.7, frameKey:"expl_1",      frameX:0,  frameY:192,frameW:32, frameH:32},
+    {type:"Text",  name:"score",      x:30, y:20, alpha:1,   frameKey:null},
+    {type:"Text",  name:"lives",      x:750,y:20, alpha:1,   frameKey:null},
+    {type:"Text",  name:"fps",        x:750,y:36, alpha:0.6, frameKey:null},
+    {type:"Graphics",name:"hpbar_bg",  x:30, y:38, alpha:1,  frameKey:null},
+    {type:"Graphics",name:"hpbar_fill",x:30, y:38, alpha:1,  frameKey:null},
+  ]
+};
+
+// ── Boot ───────────────────────────────────────────────────
+
+})();
+</script>
+</body>
+</html>
