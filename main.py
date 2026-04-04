@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 # --- Load frames lookup ---
 FRAMES_FILEPATH = Path("data") / "frames.csv"
 
@@ -59,7 +62,7 @@ class PixiPayload(BaseModel):
 async def ingest(payload: PixiPayload):
     for obj in payload.renderables:
         name = resolve_frame_name(obj)
-        print(f"{name} @ ({obj.x}, {obj.y})")
+        logger.info(f"{name} @ ({obj.x}, {obj.y})")
 
 # --- Selenium ---
 INJECT_SCRIPT_FILEPATH = Path("js") / "pixi4-render-spy.js"
