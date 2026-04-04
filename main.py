@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 # --- Load frames lookup ---
 FRAMES_FILEPATH = Path("data") / "frames.csv"
 
